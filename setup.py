@@ -8,17 +8,18 @@ import warnings
 
 dynamic_requires = []
 
-version = 0.2
+version = 0.1
 
 setup(
-    name='zengge',
-    version=0.2,
-    author='Matthew Garrett',
-    author_email='mjg59@srcf.ucam.org',
-    url='http://github.com/mjg59/python-zengge',
+    name='mipow',
+    version=0.1,
+    author='Arttu Mahlakaarto',
+    author_email='Arttu.mahlakaarto@gmail.com',
+    url='http://github.com/amahlaka/python-mipow',
     packages=find_packages(),
+    download_url='https://github.com/amahlaka/python-mipow/tarball/0.1',
     scripts=[],
-    description='Python API for controlling Zengge LED bulbs',
+    description='Python API for controlling Mipow Smart LED bulbs',
     classifiers=[
         'Development Status :: 4 - Beta',
         'Intended Audience :: Developers',
