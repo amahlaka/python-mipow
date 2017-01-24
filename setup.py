@@ -12,7 +12,7 @@ version = 0.1
 
 setup(
     name='mipow',
-    version=0.1,
+    version=0.3,
     author='Arttu Mahlakaarto',
     author_email='Arttu.mahlakaarto@gmail.com',
     url='http://github.com/amahlaka/python-mipow',

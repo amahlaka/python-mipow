@@ -1,7 +1,8 @@
-# Python module for control of Mipow LED bulbs
-#
+# Python module for control of Mipow bluetooth LED bulbs
+
 # Copyright 2016 Arttu Mahlakaarto <Arttu.mahlakaarto@gmail.com>
-# Based on work by Matthew Garret
+# Copyright 2017 Matthew Garrett <mjg59@srcf.ucam.org>
+#
 # This code is released under the terms of the MIT license. See the LICENSE
 # file for more details.
 
@@ -9,74 +10,65 @@ import time
 
 from bluepy import btle
 
-
-class Delegate(btle.DefaultDelegate):
-    """Delegate Class."""
-
-    def __init__(self, bulb):
-        self.bulb = bulb
-        btle.DefaultDelegate.__init__(self)
-
-
-
 class mipow:
   def __init__(self, mac):
     self.mac = mac
 
-  def set_state(self, white, red, green, blue, power):
-    self.white = white
-    self.red = red
-    self.green = green
-    self.blue = blue
-
   def connect(self):
     self.device = btle.Peripheral(self.mac, addrType=btle.ADDR_TYPE_PUBLIC)
-    self.device.setDelegate(Delegate(self))
+    self.rgbwhandle = None
+    self.effecthandle = None
+    self.mono = False
+    handles = self.device.getCharacteristics()
+    for handle in handles:
+      if handle.uuid == "fffb":
+        self.effecthandle = handle
+      if handle.uuid == "fffc":
+        self.rgbwhandle = handle
+      if handle.uuid == "2a39":
+        self.whitehandle = handle
+
+    if self.rgbwhandle == None:
+        self.mono = True
+
     self.get_state()
 
-  def send_packet(self, handleId, data):
-    initial = time.time()
-    while True:
-        if time.time() - initial >= 10:
-            return False
-        try:
-            return self.device.writeCharacteristic(handleId, data)
-        except:
+  def get_state(self):
+      initial = time.time()
+      while True:
+          if time.time() - initial >= 10:
+              return False
+          try:            
+            if self.mono:
+              data = self.whitehandle.read()
+              self.white = data[0]
+              if self.white > 0:
+                self.power = True
+              else:
+                self.power = False
+            else:
+              data = self.rgbwhandle.read()
+              self.white = data[0]
+              self.red = data[1]
+              self.green = data[2]
+              self.blue = data[3]
+              if bytearray(data) != bytearray([0, 0, 0, 0]):
+                self.power = True
+              else:
+                self.power = False
+            return
+          except Exception as e:
             self.connect()
 
-  def off(self):
-    self.power = False
-    packet = bytearray([0x00, 0x00, 0x00, 0x00])
-    self.send_packet(37, packet)
-
-  def on(self):
-    self.power = True
-    packet = bytearray([0xff, 0x00, 0x00, 0x00])
-    self.send_packet(37, packet)
-
-  def set_rgb(self, red, green, blue):
-    self.red = red
-    self.green = green
-    self.blue = blue
-    self.white = 0
-    packet = bytearray([0x00, red, green, blue])
-    self.send_packet(37, packet)
-
-  def set_white(self, white):
-    self.red = 0
-    self.green = 0
-    self.blue = 0
-    self.white = white
-    packet = bytearray([white, 0x00, 0x00, 0x00])
-    self.send_packet(37, packet)
-
-  def set_rgbw(self, red, green, blue, white):
-    self.red = red
-    self.green = green
-    self.blue = blue
-    self.white = white
-    packet = bytearray([white, red, green, blue])
-    self.send_packet(37, packet)
+  def send_packet(self, handle, data):
+    initial = time.time()
+    while True:
+      if time.time() - initial >= 10:
+        return False
+      try:
+        return handle.write(bytes(data))
+      except:
+        self.connect()
 
   def set_effect(self, red, green, blue, white, mode, speed):
     self.red = red
@@ -86,27 +78,36 @@ class mipow:
     self.mode = mode
     self.speed = speed
     packet = bytearray([white, red, green, blue, mode, 0x00, 0x14, speed])
-    self.send_packet(35, packet)
+    self.send_packet(self.effecthandle, packet)
 
-  def get_state(self):
-    status = self.device.readCharacteristic(37)
-    if bytearray(status) != bytearray([0, 0, 0, 0]):
-        self.power = True
+  def set_rgb(self, red, green, blue):
+    self.set_rgbw(red, green, blue, 0)
+
+  def set_rgbw(self, red, green, blue, white):
+    self.red = red
+    self.green = green
+    self.blue = blue
+    self.white = white
+    packet = bytearray([white, red, green, blue])
+    self.send_packet(self.rgbwhandle, packet)
+
+  def get_rgbw(self):
+    if self.mono:
+      return None
+    self.get_state()
+    return (self.red, self.green, self.blue, self.white)
+
+  def set_white(self, white):
+    self.white = white
+    if self.mono:
+      packet = bytearray([white])
+      self.send_packet(self.monohandle, packet)
     else:
-        self.power = False
-    self.white = status[0]
-    self.red = status[1]
-    self.green = status[2]
-    self.blue = status[3]
-    return status
+      self.set_rgbw(0, 0, 0, white)
 
-
+  def get_white(self):
+    self.get_state()
+    return self.white
 
   def get_on(self):
     return self.power
-
-  def get_colour(self):
-    return (self.red, self.green, self.blue)
-
-  def get_white(self):
-    return self.white
